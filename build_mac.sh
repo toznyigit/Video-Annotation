@@ -43,6 +43,7 @@ pyinstaller \
     --osx-bundle-identifier="com.toznyigit.videoannotator" \
     --add-data="USER_MANUAL.md:." \
     --add-data="LICENSE:." \
+    --add-data="assets:assets" \
     --hidden-import="openpyxl" \
     --hidden-import="openpyxl.styles" \
     --hidden-import="PyQt6.QtCore" \

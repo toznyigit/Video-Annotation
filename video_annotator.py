@@ -66,12 +66,62 @@ TEXT_MUTED      = "#64748b"  # Muted placeholder and footer text
 MOTHER_CLR      = "#f59e0b"  # Warm Amber for Mother role
 CHILD_CLR       = "#14b8a6"  # Vibrant Teal for Child role
 
+
+def ensure_assets():
+    base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    assets_dir = os.path.join(base_dir, "assets")
+    try:
+        os.makedirs(assets_dir, exist_ok=True)
+    except Exception:
+        import tempfile
+        assets_dir = os.path.join(tempfile.gettempdir(), "video_annotator_assets")
+        os.makedirs(assets_dir, exist_ok=True)
+
+    up_path = os.path.join(assets_dir, "arrow_up.png")
+    dn_path = os.path.join(assets_dir, "arrow_down.png")
+
+    if not os.path.exists(up_path) or not os.path.exists(dn_path):
+        from PyQt6.QtGui import QImage, QPainter, QColor, QPolygon
+        from PyQt6.QtCore import QPoint
+
+        # Up arrow
+        img_up = QImage(16, 16, QImage.Format.Format_ARGB32)
+        img_up.fill(QColor(0, 0, 0, 0))
+        p = QPainter(img_up)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setBrush(QColor('#94a3b8'))
+        p.setPen(QColor(0, 0, 0, 0))
+        p.drawPolygon(QPolygon([QPoint(8, 5), QPoint(13, 11), QPoint(3, 11)]))
+        p.end()
+        img_up.save(up_path, "PNG")
+
+        # Down arrow
+        img_dn = QImage(16, 16, QImage.Format.Format_ARGB32)
+        img_dn.fill(QColor(0, 0, 0, 0))
+        p = QPainter(img_dn)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setBrush(QColor('#94a3b8'))
+        p.setPen(QColor(0, 0, 0, 0))
+        p.drawPolygon(QPolygon([QPoint(8, 11), QPoint(13, 5), QPoint(3, 5)]))
+        p.end()
+        img_dn.save(dn_path, "PNG")
+
+    return up_path.replace("\\", "/"), dn_path.replace("\\", "/")
+
+ARROW_UP_PATH, ARROW_DOWN_PATH = ensure_assets()
+
 STYLESHEET = f"""
-QMainWindow, QWidget {{
+QMainWindow {{
     background-color: {DARK_BG};
+}}
+QWidget {{
     color: {TEXT_MAIN};
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
     font-size: 13px;
+}}
+QLabel {{
+    background-color: transparent;
+    color: {TEXT_MAIN};
 }}
 
 /* Card / GroupBox Containers */
@@ -190,26 +240,60 @@ QLineEdit[readOnly="true"] {{
     border-color: #222636;
 }}
 
-/* SpinBox Controls */
-QSpinBox::up-button, QDoubleSpinBox::up-button,
-QSpinBox::down-button, QDoubleSpinBox::down-button {{
-    background: #1c2030;
-    border: none;
-    width: 18px;
-    border-radius: 3px;
+/* SpinBox Controls & Arrows */
+QSpinBox, QDoubleSpinBox {{
+    padding-right: 24px;
 }}
-QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+QSpinBox::up-button, QDoubleSpinBox::up-button {{
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 22px;
+    height: 17px;
+    background: #1c2030;
+    border-left: 1px solid {BORDER_INPUT};
+    border-bottom: 1px solid {BORDER_INPUT};
+    border-top-right-radius: 5px;
+}}
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
+    background: #2b324a;
+}}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+    image: url("{ARROW_UP_PATH}");
+    width: 10px;
+    height: 10px;
+}}
+QSpinBox::down-button, QDoubleSpinBox::down-button {{
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 22px;
+    height: 17px;
+    background: #1c2030;
+    border-left: 1px solid {BORDER_INPUT};
+    border-bottom-right-radius: 5px;
+}}
 QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
     background: #2b324a;
+}}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+    image: url("{ARROW_DOWN_PATH}");
+    width: 10px;
+    height: 10px;
 }}
 
 /* ComboBox */
 QComboBox {{
-    padding-right: 20px;
+    padding-right: 24px;
 }}
 QComboBox::drop-down {{
+    subcontrol-origin: border;
+    subcontrol-position: center right;
+    width: 22px;
     border: none;
-    width: 20px;
+}}
+QComboBox::down-arrow {{
+    image: url("{ARROW_DOWN_PATH}");
+    width: 10px;
+    height: 10px;
 }}
 QComboBox QAbstractItemView {{
     background-color: {SURFACE_BG};
@@ -286,12 +370,12 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 }}
 
 /* Splitter */
-QSplitter::handle {{
-    background-color: #1a1e2d;
-    width: 3px;
+QSplitter::handle:horizontal {{
+    background-color: transparent;
+    width: 16px;
 }}
 QSplitter::handle:hover {{
-    background-color: {ACCENT};
+    background-color: #1a1e2d;
 }}
 """
 
@@ -518,8 +602,10 @@ class VideoAnnotator(QMainWindow):
 
         root.addWidget(self.top_bar_widget)
 
-        # Resizable Splitter
+        # Resizable Splitter with distinct gap between panels
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.setHandleWidth(16)
+        self.splitter.setChildrenCollapsible(False)
         root.addWidget(self.splitter, stretch=1)
         self.splitter.addWidget(self._build_left())
         self.right_panel = self._build_right()
@@ -530,7 +616,7 @@ class VideoAnnotator(QMainWindow):
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setSpacing(8)
-        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setContentsMargins(0, 0, 4, 0)
 
         # Video Widget (Resizable, Expanding, Double-click to Fullscreen)
         self.video_widget = ClickableVideoWidget()
@@ -583,7 +669,7 @@ class VideoAnnotator(QMainWindow):
         fl.setVerticalSpacing(8)
 
         lbl_vid = QLabel("Video File:")
-        lbl_vid.setFixedWidth(85)
+        lbl_vid.setFixedWidth(95)
         lbl_vid.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         lbl_vid.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 600;")
         self.video_path_lbl = QLineEdit()
@@ -602,7 +688,7 @@ class VideoAnnotator(QMainWindow):
         fl.addWidget(btn_vid, 0, 2)
 
         lbl_txt = QLabel("Questions:")
-        lbl_txt.setFixedWidth(85)
+        lbl_txt.setFixedWidth(95)
         lbl_txt.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         lbl_txt.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 600;")
         self.txt_path_lbl = QLineEdit()
@@ -621,43 +707,58 @@ class VideoAnnotator(QMainWindow):
         fl.addWidget(btn_txt, 1, 2)
         cl.addWidget(fg)
 
-        # Session Settings group with 2-column Grid Layout
+        # Session Settings group with unified 2-column Grid Layout
         cg = QGroupBox("Session Settings")
         cgl = QGridLayout(cg)
         cgl.setContentsMargins(14, 14, 14, 14)
         cgl.setHorizontalSpacing(10)
         cgl.setVerticalSpacing(10)
 
-        # Row 0: Start Time (s) | End Time (s)
-        lbl_start = QLabel("Start (s):")
-        lbl_start.setFixedWidth(85)
-        lbl_start.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        lbl_start.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 600;")
+        # Row 0: Time Range (Start and End equal width, paired side-by-side)
+        lbl_range = QLabel("Time Range:")
+        lbl_range.setFixedWidth(95)
+        lbl_range.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        lbl_range.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 600;")
+
+        range_container = QWidget()
+        range_container.setStyleSheet("background: transparent;")
+        range_layout = QHBoxLayout(range_container)
+        range_layout.setContentsMargins(0, 0, 0, 0)
+        range_layout.setSpacing(8)
+
+        lbl_start_sub = QLabel("Start (s):")
+        lbl_start_sub.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 500;")
         self.start_spin = QSpinBox()
         self.start_spin.setRange(0, 999999)
+        self.start_spin.setFixedWidth(110)
         self.start_spin.setFixedHeight(36)
 
-        lbl_end = QLabel("End (s):")
-        lbl_end.setFixedWidth(75)
-        lbl_end.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        lbl_end.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 600;")
+        lbl_end_sub = QLabel("End (s):")
+        lbl_end_sub.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 500;")
         self.end_spin = QSpinBox()
         self.end_spin.setRange(0, 999999)
         self.end_spin.setValue(60)
+        self.end_spin.setFixedWidth(110)
         self.end_spin.setFixedHeight(36)
 
-        cgl.addWidget(lbl_start, 0, 0)
-        cgl.addWidget(self.start_spin, 0, 1)
-        cgl.addWidget(lbl_end, 0, 2)
-        cgl.addWidget(self.end_spin, 0, 3)
+        range_layout.addWidget(lbl_start_sub)
+        range_layout.addWidget(self.start_spin)
+        range_layout.addSpacing(16)
+        range_layout.addWidget(lbl_end_sub)
+        range_layout.addWidget(self.end_spin)
+        range_layout.addStretch()
+
+        cgl.addWidget(lbl_range, 0, 0)
+        cgl.addWidget(range_container, 0, 1)
 
         # Row 1: Step Presets
         lbl_presets = QLabel("Step Presets:")
-        lbl_presets.setFixedWidth(85)
+        lbl_presets.setFixedWidth(95)
         lbl_presets.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         lbl_presets.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 600;")
 
         preset_container = QWidget()
+        preset_container.setStyleSheet("background: transparent;")
         preset_layout = QHBoxLayout(preset_container)
         preset_layout.setContentsMargins(0, 0, 0, 0)
         preset_layout.setSpacing(6)
@@ -677,32 +778,36 @@ class VideoAnnotator(QMainWindow):
         preset_layout.addStretch()
 
         cgl.addWidget(lbl_presets, 1, 0)
-        cgl.addWidget(preset_container, 1, 1, 1, 3)
+        cgl.addWidget(preset_container, 1, 1)
 
-        # Row 2: Custom Step Size | Participant Label
-        lbl_step = QLabel("Step Size (s):")
-        lbl_step.setFixedWidth(85)
+        # Row 2: Custom Step Size & Participant Label
+        lbl_step = QLabel("Step & Role:")
+        lbl_step.setFixedWidth(95)
         lbl_step.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         lbl_step.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 600;")
+
+        step_role_container = QWidget()
+        step_role_container.setStyleSheet("background: transparent;")
+        step_role_layout = QHBoxLayout(step_role_container)
+        step_role_layout.setContentsMargins(0, 0, 0, 0)
+        step_role_layout.setSpacing(8)
+
+        lbl_step_sub = QLabel("Step (s):")
+        lbl_step_sub.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 500;")
         self.step_spin = QDoubleSpinBox()
         self.step_spin.setRange(0.1, 300)
         self.step_spin.setValue(1.0)
         self.step_spin.setSingleStep(0.5)
+        self.step_spin.setFixedWidth(110)
         self.step_spin.setFixedHeight(36)
         self.step_spin.valueChanged.connect(self._on_step_value_changed)
 
-        lbl_role = QLabel("Participant:")
-        lbl_role.setFixedWidth(75)
-        lbl_role.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        lbl_role.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 600;")
-
-        role_container = QWidget()
-        role_layout = QHBoxLayout(role_container)
-        role_layout.setContentsMargins(0, 0, 0, 0)
-        role_layout.setSpacing(8)
+        lbl_role_sub = QLabel("Role:")
+        lbl_role_sub.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: 500;")
 
         self.label_combo = QComboBox()
         self.label_combo.addItems(["Mother", "Child"])
+        self.label_combo.setFixedWidth(110)
         self.label_combo.setFixedHeight(36)
         self.label_combo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.label_combo.currentTextChanged.connect(self._on_label_change)
@@ -710,15 +815,18 @@ class VideoAnnotator(QMainWindow):
         self.badge = QLabel("● Mother")
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.badge.setFixedHeight(36)
-        self.badge.setStyleSheet(f"background: rgba(245, 158, 11, 0.15); color: {MOTHER_CLR}; border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 4px 12px; font-weight: 700;")
+        self.badge.setStyleSheet(f"background: rgba(245, 158, 11, 0.15); color: {MOTHER_CLR}; border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 4px 14px; font-weight: 700;")
 
-        role_layout.addWidget(self.label_combo, 1)
-        role_layout.addWidget(self.badge, 1)
+        step_role_layout.addWidget(lbl_step_sub)
+        step_role_layout.addWidget(self.step_spin)
+        step_role_layout.addSpacing(16)
+        step_role_layout.addWidget(lbl_role_sub)
+        step_role_layout.addWidget(self.label_combo)
+        step_role_layout.addWidget(self.badge)
+        step_role_layout.addStretch()
 
         cgl.addWidget(lbl_step, 2, 0)
-        cgl.addWidget(self.step_spin, 2, 1)
-        cgl.addWidget(lbl_role, 2, 2)
-        cgl.addWidget(role_container, 2, 3)
+        cgl.addWidget(step_role_container, 2, 1)
 
         cl.addWidget(cg)
 
@@ -759,7 +867,7 @@ class VideoAnnotator(QMainWindow):
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setSpacing(10)
-        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setContentsMargins(4, 0, 0, 0)
 
         qa_grp = QGroupBox("Current Question Prompt")
         qg = QVBoxLayout(qa_grp)

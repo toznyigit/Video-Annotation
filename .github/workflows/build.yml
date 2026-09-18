@@ -39,7 +39,7 @@ jobs:
       - name: Build Windows Executable
         shell: cmd
         run: |
-          pyinstaller --name="VideoAnnotator" --onefile --windowed --noconfirm --clean --add-data="USER_MANUAL.md;." --add-data="LICENSE;." --hidden-import="openpyxl" --hidden-import="openpyxl.styles" --hidden-import="PyQt6.QtMultimedia" --hidden-import="PyQt6.QtMultimediaWidgets" --collect-all="PyQt6" video_annotator.py
+          pyinstaller --name="VideoAnnotator" --onefile --windowed --noconfirm --clean --add-data="USER_MANUAL.md;." --add-data="LICENSE;." --add-data="assets;assets" --hidden-import="openpyxl" --hidden-import="openpyxl.styles" --hidden-import="PyQt6.QtMultimedia" --hidden-import="PyQt6.QtMultimediaWidgets" --collect-all="PyQt6" video_annotator.py
           cd dist
           copy ..\USER_MANUAL.md .\
           copy ..\LICENSE .\
@@ -79,6 +79,7 @@ jobs:
             --osx-bundle-identifier="com.toznyigit.videoannotator" \
             --add-data="USER_MANUAL.md:." \
             --add-data="LICENSE:." \
+            --add-data="assets:assets" \
             --hidden-import="openpyxl" \
             --hidden-import="openpyxl.styles" \
             --hidden-import="PyQt6.QtCore" \
