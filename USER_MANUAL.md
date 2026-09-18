@@ -1,6 +1,6 @@
 # Video Annotation Tool — User Manual
 
-**Version:** 1.1.0  
+**Version:** 1.1.1  
 **License:** GNU General Public License v3.0 ([GPL-3.0](file:///Users/tameryigit/Documents/AG_Projects/V/video_iter_2/LICENSE))  
 **Platforms:** macOS, Windows, Linux  
 
@@ -105,7 +105,7 @@ Rate the engagement level (1-5):
 
 ```text
 +───────────────────────────────────────────────────────────────────────────────────────────────+
-| 🎬 Video Annotation Tool  v1.1.0 • GPL-3.0                   [📖 User Manual]  [⚖️ About]     |
+| 🎬 Video Annotation Tool  v1.1.1 • GPL-3.0                   [📖 User Manual]  [⚖️ About]     |
 +───────────────────────────────────────────────+───────────────────────────────────────────────+
 |                  LEFT PANEL                   |                  RIGHT PANEL                  |
 +───────────────────────────────────────────────+───────────────────────────────────────────────+

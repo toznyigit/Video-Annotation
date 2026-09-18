@@ -41,7 +41,7 @@ try:
 except ImportError:
     OPENPYXL_AVAILABLE = False
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 # ── Modern Design System Palette ──────────────────────────────────────────────
 DARK_BG         = "#0f111a"  # Deep canvas background
