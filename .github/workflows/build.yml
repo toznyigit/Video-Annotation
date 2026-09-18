@@ -2,9 +2,17 @@ name: Build Standalone Executables & Release
 
 on:
   push:
+    branches:
+      - main
+      - master
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
 
 permissions:
   contents: write
@@ -79,40 +87,57 @@ jobs:
     name: Publish GitHub Release
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Determine Release Tag
+        id: vars
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG="${{ github.ref_name }}"
+          elif [ -n "${{ inputs.tag_name }}" ]; then
+            TAG="${{ inputs.tag_name }}"
+          else
+            TAG="v1.0.0"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Using release tag: ${TAG}"
 
       - name: Download Windows Artifact
         uses: actions/download-artifact@v4
         with:
           name: VideoAnnotator-Windows
-          path: dist/
+          path: dist
 
       - name: Download macOS Artifact
         uses: actions/download-artifact@v4
         with:
           name: VideoAnnotator-macOS
-          path: dist/
+          path: dist
 
-      - name: Create Release
+      - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: "Video Annotation Tool ${{ steps.vars.outputs.tag }}"
           files: |
             dist/VideoAnnotator-Windows.zip
             dist/VideoAnnotator-macOS.zip
             USER_MANUAL.md
             LICENSE
           body: |
-            ## Video Annotation Tool Release
+            ## Video Annotation Tool Release (${{ steps.vars.outputs.tag }})
 
             ### 📦 Standalone Downloads (No Python Required)
-            - **Windows**: [VideoAnnotator-Windows.zip](dist/VideoAnnotator-Windows.zip) (Contains `VideoAnnotator.exe`)
-            - **macOS**: [VideoAnnotator-macOS.zip](dist/VideoAnnotator-macOS.zip) (Contains `VideoAnnotator.app`)
+            - **Windows**: Download `VideoAnnotator-Windows.zip` (unzip and double-click `VideoAnnotator.exe`)
+            - **macOS**: Download `VideoAnnotator-macOS.zip` (unzip and open `VideoAnnotator.app`)
 
             ### 📖 Documentation
-            - Included in each download and available in repository: [USER_MANUAL.md](USER_MANUAL.md)
+            - Read the included [USER_MANUAL.md](USER_MANUAL.md) for full setup and usage instructions.
             - Distributed under the [GNU General Public License v3.0 (GPL-3.0)](LICENSE).
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
