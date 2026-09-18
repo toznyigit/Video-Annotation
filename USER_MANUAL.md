@@ -42,7 +42,7 @@ You can run the Video Annotation Tool in two ways:
 
 | Platform | How to Run |
 | :--- | :--- |
-| **macOS** | Unzip `VideoAnnotator-macOS.zip`, open `VideoAnnotator.app`. If macOS displays a Gatekeeper prompt on first launch, right-click the app and choose **Open**. |
+| **macOS** | 1. Unzip `VideoAnnotator-macOS.zip` and open `VideoAnnotator.app`.<br>2. **If blocked by Gatekeeper:** Open **System Settings** → **Privacy & Security** → scroll down to **Security** → click **Open Anyway** (or run `xattr -cr VideoAnnotator.app` in Terminal). |
 | **Windows** | Double-click `VideoAnnotator.exe`. No installation or Python setup is necessary. |
 
 ---
@@ -207,8 +207,14 @@ The tool features a dedicated **Full Screen Annotation Mode**:
 #### Q: Video does not play or shows a black screen.
 - Ensure the video is encoded with standard **H.264 video** and **AAC audio**.
 
-#### Q: On macOS, I see "Video Annotator can't be opened because it is from an unidentified developer".
-- Right-click `Video Annotator.app`, select **Open**, and confirm **Open** in the prompt.
+#### Q: On macOS, I see "VideoAnnotator.app can't be opened because Apple cannot check it for malicious software" or "unidentified developer".
+Because this is an open-source application without an Apple Developer ID signature, macOS Gatekeeper blocks it by default on first launch. To permit and run it:
+1. Open **System Settings** (from the  Apple menu).
+2. Go to **Privacy & Security** in the left sidebar.
+3. Scroll down to the **Security** section.
+4. You will see a notification stating: *"VideoAnnotator.app was blocked from use because it is not from an identified developer"*.
+5. Click **Open Anyway** and confirm by clicking **Open** (enter password or Touch ID if requested).
+*(Alternatively, you can open Terminal and run `xattr -cr /path/to/VideoAnnotator.app` to clear the quarantine flag directly.)*
 
 ---
 

@@ -32,6 +32,7 @@ Precompiled zero-dependency binaries are available directly from the **[GitHub R
 - 🍏 **macOS:**
   - **Direct Download:** [**`VideoAnnotator-macOS.zip`**](https://github.com/toznyigit/Video-Annotation/releases/latest/download/VideoAnnotator-macOS.zip)
   - Alternatively, download from the [Latest Release Page](https://github.com/toznyigit/Video-Annotation/releases/latest). Unzip and run `VideoAnnotator.app`.
+  - *First Launch Note:* If macOS displays a Gatekeeper prompt on first launch, go to **System Settings** → **Privacy & Security** → scroll down to **Security** → click **Open Anyway** (or run `xattr -cr VideoAnnotator.app` in Terminal).
 - 🪟 **Windows:**
   - **Direct Download:** [**`VideoAnnotator-Windows.zip`**](https://github.com/toznyigit/Video-Annotation/releases/latest/download/VideoAnnotator-Windows.zip)
   - Alternatively, download from the [Latest Release Page](https://github.com/toznyigit/Video-Annotation/releases/latest). Unzip and double-click `VideoAnnotator.exe`.
