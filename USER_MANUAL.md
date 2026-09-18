@@ -42,7 +42,7 @@ You can run the Video Annotation Tool in two ways:
 
 | Platform | How to Run |
 | :--- | :--- |
-| **macOS** | 1. Unzip `VideoAnnotator-macOS.zip` and open `VideoAnnotator.app`.<br>2. **If blocked by Gatekeeper:** Open **System Settings** → **Privacy & Security** → scroll down to **Security** → click **Open Anyway** (or run `xattr -cr VideoAnnotator.app` in Terminal). |
+| **macOS** | Unzip `VideoAnnotator-macOS.zip` and open `VideoAnnotator.app`. (If blocked by Gatekeeper: Open **System Settings** → **Privacy & Security** → scroll down to **Security** → click **Open Anyway**, or run `xattr -cr VideoAnnotator.app` in Terminal). |
 | **Windows** | Double-click `VideoAnnotator.exe`. No installation or Python setup is necessary. |
 
 ---
@@ -103,7 +103,7 @@ Rate the engagement level (1-5):
 
 ## 5. Interface & Layout Guide
 
-```
+```text
 +───────────────────────────────────────────────────────────────────────────────────────────────+
 | 🎬 Video Annotation Tool  v1.1.0 • GPL-3.0                   [📖 User Manual]  [⚖️ About]     |
 +───────────────────────────────────────────────+───────────────────────────────────────────────+
@@ -187,10 +187,10 @@ The tool features a dedicated **Full Screen Annotation Mode**:
 
 | Action | Shortcut / Gesture |
 | :--- | :--- |
-| **Submit Answer & Next Question** | <kbd>Ctrl</kbd> + <kbd>Return</kbd> / <kbd>Cmd</kbd> + <kbd>Return</kbd> |
-| **Toggle Full Screen Mode** | <kbd>F11</kbd> or **Double-Click Video** |
-| **Exit Full Screen Mode** | <kbd>Escape</kbd> or <kbd>F11</kbd> |
-| **Stop Session Early** | Click **■ Stop** (keeps already recorded data) |
+| **Submit Answer & Next Question** | `Ctrl` + `Return` / `Cmd` + `Return` |
+| **Toggle Full Screen Mode** | `F11` or **Double-Click Video** |
+| **Exit Full Screen Mode** | `Escape` or `F11` |
+| **Stop Session Early** | Click **■ Stop** (preserves already recorded data) |
 | **Clear Records** | Click **🗑 Clear Table** |
 
 ---

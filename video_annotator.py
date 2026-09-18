@@ -268,6 +268,7 @@ QPushButton#neutral {{
     background-color: {BTN_NEUTRAL};
     border: 1px solid {BORDER_INPUT};
     color: #cbd5e1;
+    padding: 6px 12px;
 }}
 QPushButton#neutral:hover {{
     background-color: {BTN_NEUTRAL_HOVER};
@@ -724,6 +725,10 @@ class VideoAnnotator(QMainWindow):
         fl.setHorizontalSpacing(10)
         fl.setVerticalSpacing(8)
 
+        fl.setColumnStretch(0, 0)
+        fl.setColumnStretch(1, 1)
+        fl.setColumnStretch(2, 0)
+
         lbl_vid = QLabel("Video File:")
         lbl_vid.setFixedWidth(95)
         lbl_vid.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -734,7 +739,7 @@ class VideoAnnotator(QMainWindow):
         self.video_path_lbl.setFixedHeight(36)
         btn_vid = QPushButton("Browse Video")
         btn_vid.setObjectName("neutral")
-        btn_vid.setFixedWidth(120)
+        btn_vid.setFixedWidth(150)
         btn_vid.setFixedHeight(36)
         btn_vid.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_vid.clicked.connect(self._browse_video)
@@ -753,7 +758,7 @@ class VideoAnnotator(QMainWindow):
         self.txt_path_lbl.setFixedHeight(36)
         btn_txt = QPushButton("Browse Questions")
         btn_txt.setObjectName("neutral")
-        btn_txt.setFixedWidth(120)
+        btn_txt.setFixedWidth(150)
         btn_txt.setFixedHeight(36)
         btn_txt.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_txt.clicked.connect(self._browse_txt)
@@ -1164,35 +1169,35 @@ class VideoAnnotator(QMainWindow):
         header.addStretch()
         d_lay.addLayout(header)
 
+        clean_content = content.replace("<br>", " ")
+        clean_content = clean_content.replace("<kbd>", "`").replace("</kbd>", "`")
+        clean_content = clean_content.replace("```\n+───", "```text\n+───")
+
         browser = QTextBrowser()
         browser.setOpenExternalLinks(True)
-        browser.setStyleSheet(f"background-color: {INPUT_BG}; color: #cbd5e1; border: 1px solid {BORDER_COLOR}; border-radius: 8px; padding: 18px;")
-        browser.setMarkdown(content)
-        raw_html = browser.toHtml()
-        custom_css = f"""
-        <style>
-        body {{
-            background-color: {INPUT_BG};
-            color: #cbd5e1;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 13px;
-            line-height: 1.6;
-        }}
-        h1 {{ color: {ACCENT2}; font-size: 22px; font-weight: 700; margin-bottom: 12px; border-bottom: 1px solid {BORDER_COLOR}; padding-bottom: 6px; }}
-        h2 {{ color: #a5b4fc; font-size: 17px; font-weight: 600; margin-top: 20px; margin-bottom: 8px; }}
-        h3 {{ color: #e2e8f0; font-size: 14px; font-weight: 600; margin-top: 14px; margin-bottom: 6px; }}
-        p, li {{ color: #cbd5e1; font-size: 13px; }}
-        a {{ color: {ACCENT2}; font-weight: 600; text-decoration: none; }}
-        code {{ background-color: #1e2438; color: #38bdf8; font-family: monospace; font-size: 12px; }}
-        table {{ border-collapse: collapse; margin: 12px 0; width: 100%; }}
-        th {{ background-color: #202538; color: {TEXT_MAIN}; font-weight: 700; border: 1px solid #2e354e; padding: 8px 12px; }}
-        td {{ border: 1px solid {BORDER_COLOR}; padding: 8px 12px; color: #cbd5e1; }}
-        hr {{ border: none; border-top: 1px solid {BORDER_COLOR}; margin: 16px 0; }}
-        </style>
-        """
-        styled_html = raw_html.replace("<style type=\"text/css\">", custom_css + "<style type=\"text/css\">")
-        styled_html = styled_html.replace("color:#094fd1;", f"color:{ACCENT2};")
-        browser.setHtml(styled_html)
+        browser.setStyleSheet(f"""
+            QTextBrowser {{
+                background-color: {INPUT_BG};
+                color: #cbd5e1;
+                border: 1px solid {BORDER_COLOR};
+                border-radius: 8px;
+                padding: 18px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                font-size: 13px;
+            }}
+        """)
+        browser.document().setDefaultStyleSheet(f"""
+            h1 {{ color: {ACCENT2}; font-size: 20px; font-weight: bold; margin-bottom: 8px; }}
+            h2 {{ color: #a5b4fc; font-size: 16px; font-weight: bold; margin-top: 18px; margin-bottom: 6px; }}
+            h3 {{ color: #e2e8f0; font-size: 14px; font-weight: bold; margin-top: 12px; margin-bottom: 4px; }}
+            p, li {{ color: #cbd5e1; font-size: 13px; line-height: 1.5; }}
+            code, pre {{ background-color: #1c2133; color: #38bdf8; font-family: monospace; font-size: 12px; }}
+            table {{ border-collapse: collapse; margin: 10px 0; width: 100%; }}
+            th {{ background-color: #202538; color: {TEXT_MAIN}; font-weight: bold; padding: 6px; border: 1px solid #2e354e; }}
+            td {{ border: 1px solid {BORDER_COLOR}; padding: 6px; color: #cbd5e1; }}
+            hr {{ border: none; border-top: 1px solid {BORDER_COLOR}; margin: 14px 0; }}
+        """)
+        browser.setMarkdown(clean_content)
         d_lay.addWidget(browser, stretch=1)
 
         bottom_bar = QHBoxLayout()
