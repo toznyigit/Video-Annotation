@@ -26,11 +26,11 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QFileDialog, QLineEdit, QComboBox,
     QTableWidget, QTableWidgetItem, QSplitter, QGroupBox,
     QSpinBox, QDoubleSpinBox, QTextEdit, QMessageBox, QHeaderView,
-    QDialog, QTextBrowser,
+    QDialog, QTextBrowser, QSizePolicy, QFrame,
 )
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
-from PyQt6.QtCore import Qt, QUrl, QTimer, QEvent
+from PyQt6.QtCore import Qt, QUrl, QTimer, QEvent, pyqtSignal, QPoint
 from PyQt6.QtGui import QFont, QColor, QDesktopServices
 
 try:
@@ -40,7 +40,7 @@ try:
 except ImportError:
     OPENPYXL_AVAILABLE = False
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 # ── Colour palette ─────────────────────────────────────────────────────────────
 DARK_BG    = "#1e1e2e"
@@ -148,27 +148,174 @@ def fmt_time(ms: int) -> str:
     return str(timedelta(seconds=s))
 
 
+class ClickableVideoWidget(QVideoWidget):
+    doubleClicked = pyqtSignal()
+
+    def mouseDoubleClickEvent(self, event):
+        self.doubleClicked.emit()
+        super().mouseDoubleClickEvent(event)
+
+
+class FloatingHUD(QWidget):
+    """
+    Independent top-level translucent floating window for Full Screen mode.
+    Stays on top of native macOS/Windows video layers and can be dragged by users.
+    """
+    def __init__(self, main_win):
+        super().__init__(main_win, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+        self.main_win = main_win
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self._drag_pos = None
+
+        self._build_ui()
+
+    def _build_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(6, 6, 6, 6)
+
+        # Card container with semi-transparent glassmorphic styling
+        self.card = QFrame()
+        self.card.setObjectName("hudCard")
+        self.card.setStyleSheet(f"""
+            QFrame#hudCard {{
+                background-color: rgba(26, 26, 42, 0.95);
+                border: 2px solid {ACCENT};
+                border-radius: 14px;
+            }}
+        """)
+        card_lay = QVBoxLayout(self.card)
+        card_lay.setContentsMargins(14, 12, 14, 14)
+        card_lay.setSpacing(8)
+
+        # Top Header Bar (Draggable handle + badges + exit button)
+        hdr = QHBoxLayout()
+        hdr.setSpacing(8)
+
+        drag_icon = QLabel("⠿ Drag")
+        drag_icon.setStyleSheet("color: #8888aa; font-size: 11px; font-weight: bold;")
+        hdr.addWidget(drag_icon)
+
+        title_lbl = QLabel("🎬 Video Annotator")
+        title_lbl.setStyleSheet(f"color: {ACCENT2}; font-weight: bold; font-size: 12px;")
+        hdr.addWidget(title_lbl)
+
+        self.hud_label_combo = QComboBox()
+        self.hud_label_combo.addItems(["Mother", "Child"])
+        self.hud_label_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hud_label_combo.setToolTip("Change participant label (Mother / Child)")
+        self.hud_label_combo.currentTextChanged.connect(self.main_win._on_hud_label_change)
+        hdr.addWidget(self.hud_label_combo)
+
+        self.hud_time_lbl = QLabel("00:00:00 / 00:00:00")
+        self.hud_time_lbl.setStyleSheet("background: rgba(30,30,46,0.85); color: #e0e0f0; font-family: 'Courier New'; font-weight: bold; padding: 3px 10px; border-radius: 12px; border: 1px solid #4a4a6a;")
+        hdr.addWidget(self.hud_time_lbl)
+
+        self.hud_step_lbl = QLabel("Step — / —")
+        self.hud_step_lbl.setStyleSheet(f"background: rgba(30,30,46,0.85); color: {ACCENT2}; font-weight: bold; padding: 3px 10px; border-radius: 12px; border: 1px solid #4a4a6a;")
+        hdr.addWidget(self.hud_step_lbl)
+
+        hdr.addStretch()
+
+        btn_exit = QPushButton("✕ Exit (Esc)")
+        btn_exit.setObjectName("danger")
+        btn_exit.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_exit.setMinimumHeight(28)
+        btn_exit.clicked.connect(self.main_win._toggle_fullscreen)
+        hdr.addWidget(btn_exit)
+
+        card_lay.addLayout(hdr)
+
+        # Question prompt display
+        self.hud_q_counter = QLabel("Question — / —")
+        self.hud_q_counter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        self.hud_q_counter.setStyleSheet("color: #e0e0f0; background: transparent;")
+        card_lay.addWidget(self.hud_q_counter)
+
+        self.hud_q_text = QLabel("(no active session)")
+        self.hud_q_text.setWordWrap(True)
+        self.hud_q_text.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.hud_q_text.setStyleSheet(f"color: {ACCENT2}; padding: 8px; background: {PANEL_BG}; border-radius: 6px; border: 1px solid #4a4a6a;")
+        card_lay.addWidget(self.hud_q_text)
+
+        # Answer text input
+        self.hud_ans_input = QTextEdit()
+        self.hud_ans_input.setPlaceholderText("Type your answer here… (Ctrl+Enter or Cmd+Enter to submit)")
+        self.hud_ans_input.setMaximumHeight(75)
+        self.hud_ans_input.installEventFilter(self.main_win)
+        self.hud_ans_input.setStyleSheet(f"background: {PANEL_BG}; color: {TEXT_MAIN}; border: 1px solid {ACCENT}; border-radius: 6px; padding: 6px;")
+        card_lay.addWidget(self.hud_ans_input)
+
+        # Action Buttons (Next / Skip) — Equal size (50% / 50%)
+        h_btn_row = QHBoxLayout()
+        h_btn_row.setSpacing(10)
+
+        self.hud_btn_next = QPushButton("Next Question  ›")
+        self.hud_btn_next.setMinimumHeight(38)
+        self.hud_btn_next.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.hud_btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hud_btn_next.clicked.connect(self.main_win._next_question)
+        self.hud_btn_next.setEnabled(False)
+
+        self.hud_btn_skip = QPushButton("Skip")
+        self.hud_btn_skip.setObjectName("neutral")
+        self.hud_btn_skip.setMinimumHeight(38)
+        self.hud_btn_skip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.hud_btn_skip.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hud_btn_skip.clicked.connect(self.main_win._skip_question)
+        self.hud_btn_skip.setEnabled(False)
+
+        h_btn_row.addWidget(self.hud_btn_next, 1)
+        h_btn_row.addWidget(self.hud_btn_skip, 1)
+        card_lay.addLayout(h_btn_row)
+
+        root.addWidget(self.card)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if self._drag_pos is not None and event.buttons() == Qt.MouseButton.LeftButton:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
+        event.accept()
+
+
 class VideoAnnotator(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"Video Annotation Tool v{__version__} [GPL-3.0]")
-        self.resize(1400, 880)
+        self.resize(1420, 890)
 
-        self.video_path  = ""
-        self.questions   = []
-        self.records     = []
-        self.current_q   = 0
-        self.answers_buf = {}
-        self.step_ms     = 1000
-        self.range_start = 0
-        self.range_end   = 0
-        self.label       = "Mother"
-        self.processing  = False
-        self.waiting_ans = False
-        self.current_pos = 0
-        self.total_steps = 0
+        self.video_path     = ""
+        self.questions      = []
+        self.records        = []
+        self.current_q      = 0
+        self.answers_buf    = {}
+        self.step_ms        = 1000
+        self.range_start    = 0
+        self.range_end      = 0
+        self.label          = "Mother"
+        self.processing     = False
+        self.waiting_ans    = False
+        self.current_pos    = 0
+        self.total_steps    = 0
+        self.is_fullscreen  = False
+        self.preset_btns    = {}
+
+        # Safely pre-initialize input widgets before UI construction
+        self.ans_input      = None
+        self.btn_next_q     = None
+        self.btn_skip_q     = None
+        self.floating_hud   = None
 
         self._build_ui()
+        self.floating_hud = FloatingHUD(self)
+        self._update_hud_combo_style(self.label)
         self.setStyleSheet(STYLESHEET)
 
     # ── UI ─────────────────────────────────────────────────────────────────────
@@ -176,11 +323,14 @@ class VideoAnnotator(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        root.setSpacing(8)
+        root.setSpacing(6)
         root.setContentsMargins(10, 8, 10, 10)
 
         # Top Bar
-        top_bar = QHBoxLayout()
+        self.top_bar_widget = QWidget()
+        top_bar = QHBoxLayout(self.top_bar_widget)
+        top_bar.setContentsMargins(0, 0, 0, 0)
+
         title_lbl = QLabel("🎬 Video Annotation Tool")
         title_lbl.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         title_lbl.setStyleSheet(f"color: {ACCENT2};")
@@ -203,24 +353,31 @@ class VideoAnnotator(QMainWindow):
         btn_about.clicked.connect(self._show_about)
         top_bar.addWidget(btn_about)
 
-        root.addLayout(top_bar)
+        root.addWidget(self.top_bar_widget)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        root.addWidget(splitter, stretch=1)
-        splitter.addWidget(self._build_left())
-        splitter.addWidget(self._build_right())
-        splitter.setSizes([680, 720])
+        # Resizable Splitter
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        root.addWidget(self.splitter, stretch=1)
+        self.splitter.addWidget(self._build_left())
+        self.right_panel = self._build_right()
+        self.splitter.addWidget(self.right_panel)
+        self.splitter.setSizes([720, 700])
 
     def _build_left(self):
         w = QWidget()
         lay = QVBoxLayout(w)
-        lay.setSpacing(8)
+        lay.setSpacing(6)
+        lay.setContentsMargins(0, 0, 0, 0)
 
-        self.video_widget = QVideoWidget()
-        self.video_widget.setMinimumHeight(340)
-        self.video_widget.setStyleSheet("background: #000;")
-        lay.addWidget(self.video_widget)
+        # Video Widget (Resizable, Expanding, Double-click to Fullscreen)
+        self.video_widget = ClickableVideoWidget()
+        self.video_widget.setMinimumHeight(240)
+        self.video_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.video_widget.setStyleSheet("background: #000; border-radius: 6px;")
+        self.video_widget.doubleClicked.connect(self._toggle_fullscreen)
+        lay.addWidget(self.video_widget, stretch=1)
 
+        # Media Player bindings
         self.player = QMediaPlayer()
         self.audio  = QAudioOutput()
         self.player.setAudioOutput(self.audio)
@@ -228,60 +385,143 @@ class VideoAnnotator(QMainWindow):
         self.player.positionChanged.connect(self._on_position_changed)
         self.player.durationChanged.connect(self._on_duration_changed)
 
+        # Video Toolbar: Timestamp & Fullscreen Button
+        self.video_control_bar = QWidget()
+        v_bar = QHBoxLayout(self.video_control_bar)
+        v_bar.setContentsMargins(2, 2, 2, 2)
+
         self.time_lbl = QLabel("00:00:00 / 00:00:00")
-        self.time_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.time_lbl.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
         self.time_lbl.setStyleSheet(f"color: {ACCENT2};")
-        lay.addWidget(self.time_lbl)
+        v_bar.addWidget(self.time_lbl)
+
+        v_bar.addStretch()
+
+        self.btn_fs = QPushButton("⛶ Full Screen")
+        self.btn_fs.setObjectName("neutral")
+        self.btn_fs.setToolTip("Toggle Full Screen (F11 or double-click)")
+        self.btn_fs.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_fs.clicked.connect(self._toggle_fullscreen)
+        v_bar.addWidget(self.btn_fs)
+
+        lay.addWidget(self.video_control_bar)
+
+        # Left Controls container (hidden in fullscreen)
+        self.left_controls_widget = QWidget()
+        cl = QVBoxLayout(self.left_controls_widget)
+        cl.setSpacing(6)
+        cl.setContentsMargins(0, 0, 0, 0)
 
         # File loading group
         fg = QGroupBox("Load Files")
         fl = QVBoxLayout(fg)
+        fl.setSpacing(5)
         vrow = QHBoxLayout()
         self.video_path_lbl = QLineEdit(); self.video_path_lbl.setPlaceholderText("No video selected…"); self.video_path_lbl.setReadOnly(True)
         btn_vid = QPushButton("Browse Video"); btn_vid.clicked.connect(self._browse_video)
         vrow.addWidget(self.video_path_lbl); vrow.addWidget(btn_vid)
         fl.addLayout(vrow)
+
         qrow = QHBoxLayout()
         self.txt_path_lbl = QLineEdit(); self.txt_path_lbl.setPlaceholderText("No questions file…"); self.txt_path_lbl.setReadOnly(True)
         btn_txt = QPushButton("Browse Questions"); btn_txt.clicked.connect(self._browse_txt)
         qrow.addWidget(self.txt_path_lbl); qrow.addWidget(btn_txt)
         fl.addLayout(qrow)
-        lay.addWidget(fg)
+        cl.addWidget(fg)
 
-        # Settings group
+        # Session Settings group
         cg = QGroupBox("Session Settings")
-        cl = QVBoxLayout(cg)
-        rng = QHBoxLayout()
-        rng.addWidget(QLabel("Start (s):")); self.start_spin = QSpinBox(); self.start_spin.setRange(0,999999); rng.addWidget(self.start_spin)
-        rng.addWidget(QLabel("End (s):")); self.end_spin = QSpinBox(); self.end_spin.setRange(0,999999); self.end_spin.setValue(60); rng.addWidget(self.end_spin)
-        cl.addLayout(rng)
-        sl = QHBoxLayout()
-        sl.addWidget(QLabel("Step (s):")); self.step_spin = QDoubleSpinBox(); self.step_spin.setRange(0.1,300); self.step_spin.setValue(1.0); self.step_spin.setSingleStep(0.5); sl.addWidget(self.step_spin)
-        sl.addWidget(QLabel("Label:"))
-        self.label_combo = QComboBox(); self.label_combo.addItems(["Mother","Child"]); self.label_combo.currentTextChanged.connect(self._on_label_change); sl.addWidget(self.label_combo)
-        self.badge = QLabel("● Mother"); self.badge.setStyleSheet(f"color:{MOTHER_CLR}; font-weight:bold;"); sl.addWidget(self.badge)
-        cl.addLayout(sl)
-        lay.addWidget(cg)
+        cgl = QVBoxLayout(cg)
+        cgl.setSpacing(6)
 
-        # Action buttons
+        # Range row
+        rng = QHBoxLayout()
+        rng.addWidget(QLabel("Start (s):"))
+        self.start_spin = QSpinBox()
+        self.start_spin.setRange(0, 999999)
+        rng.addWidget(self.start_spin)
+
+        rng.addWidget(QLabel("End (s):"))
+        self.end_spin = QSpinBox()
+        self.end_spin.setRange(0, 999999)
+        self.end_spin.setValue(60)
+        rng.addWidget(self.end_spin)
+        cgl.addLayout(rng)
+
+        # Quick Step Presets row
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(QLabel("Step Presets:"))
+        self.preset_btns = {}
+        for val in [0.5, 1.0, 5.0, 10.0]:
+            label = f"{val:g}s"
+            btn = QPushButton(label)
+            btn.setObjectName("neutral")
+            btn.setCheckable(True)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked, v=val: self._on_preset_clicked(v))
+            preset_row.addWidget(btn)
+            self.preset_btns[val] = btn
+        preset_row.addStretch()
+        cgl.addLayout(preset_row)
+
+        # Custom Step and Label row
+        sl = QHBoxLayout()
+        sl.addWidget(QLabel("Custom Step (s):"))
+        self.step_spin = QDoubleSpinBox()
+        self.step_spin.setRange(0.1, 300)
+        self.step_spin.setValue(1.0)
+        self.step_spin.setSingleStep(0.5)
+        self.step_spin.valueChanged.connect(self._on_step_value_changed)
+        sl.addWidget(self.step_spin)
+
+        sl.addWidget(QLabel("Label:"))
+        self.label_combo = QComboBox()
+        self.label_combo.addItems(["Mother", "Child"])
+        self.label_combo.currentTextChanged.connect(self._on_label_change)
+        sl.addWidget(self.label_combo)
+
+        self.badge = QLabel("● Mother")
+        self.badge.setStyleSheet(f"color:{MOTHER_CLR}; font-weight:bold;")
+        sl.addWidget(self.badge)
+        cgl.addLayout(sl)
+        cl.addWidget(cg)
+
+        # Action buttons: Start / Stop (Identical size: 50% / 50%, height 42px)
         br = QHBoxLayout()
-        self.btn_start = QPushButton("▶  Start Processing"); self.btn_start.setObjectName("success"); self.btn_start.setMinimumHeight(38); self.btn_start.clicked.connect(self._start_processing)
-        self.btn_stop  = QPushButton("■  Stop"); self.btn_stop.setObjectName("danger"); self.btn_stop.setEnabled(False); self.btn_stop.clicked.connect(self._stop_processing)
-        br.addWidget(self.btn_start); br.addWidget(self.btn_stop)
-        lay.addLayout(br)
+        br.setSpacing(10)
+        self.btn_start = QPushButton("▶  Start Processing")
+        self.btn_start.setObjectName("success")
+        self.btn_start.setMinimumHeight(42)
+        self.btn_start.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_start.clicked.connect(self._start_processing)
+
+        self.btn_stop = QPushButton("■  Stop")
+        self.btn_stop.setObjectName("danger")
+        self.btn_stop.setMinimumHeight(42)
+        self.btn_stop.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_stop.setEnabled(False)
+        self.btn_stop.clicked.connect(self._stop_processing)
+
+        br.addWidget(self.btn_start, 1)
+        br.addWidget(self.btn_stop, 1)
+        cl.addLayout(br)
 
         self.status_lbl = QLabel("Ready.")
         self.status_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_lbl.setStyleSheet(f"color:{ACCENT2}; font-style:italic;")
-        lay.addWidget(self.status_lbl)
-        lay.addStretch()
+        cl.addWidget(self.status_lbl)
+
+        lay.addWidget(self.left_controls_widget)
+
+        # Initialize preset button highlight
+        self._on_step_value_changed(1.0)
         return w
 
     def _build_right(self):
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setSpacing(8)
+        lay.setContentsMargins(0, 0, 0, 0)
 
         qa_grp = QGroupBox("Current Question")
         qg = QVBoxLayout(qa_grp)
@@ -304,10 +544,24 @@ class VideoAnnotator(QMainWindow):
         self.ans_input.installEventFilter(self)
         qg.addWidget(self.ans_input)
 
+        # Question Action buttons: Next / Skip (Identical size: 50% / 50%, height 38px)
         ab = QHBoxLayout()
-        self.btn_next_q = QPushButton("Next Question  ›"); self.btn_next_q.clicked.connect(self._next_question); self.btn_next_q.setEnabled(False)
-        self.btn_skip_q = QPushButton("Skip"); self.btn_skip_q.setObjectName("neutral"); self.btn_skip_q.clicked.connect(self._skip_question); self.btn_skip_q.setEnabled(False)
-        ab.addWidget(self.btn_next_q); ab.addWidget(self.btn_skip_q)
+        ab.setSpacing(10)
+        self.btn_next_q = QPushButton("Next Question  ›")
+        self.btn_next_q.setMinimumHeight(38)
+        self.btn_next_q.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_next_q.clicked.connect(self._next_question)
+        self.btn_next_q.setEnabled(False)
+
+        self.btn_skip_q = QPushButton("Skip")
+        self.btn_skip_q.setObjectName("neutral")
+        self.btn_skip_q.setMinimumHeight(38)
+        self.btn_skip_q.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_skip_q.clicked.connect(self._skip_question)
+        self.btn_skip_q.setEnabled(False)
+
+        ab.addWidget(self.btn_next_q, 1)
+        ab.addWidget(self.btn_skip_q, 1)
         qg.addLayout(ab)
         lay.addWidget(qa_grp)
 
@@ -320,28 +574,118 @@ class VideoAnnotator(QMainWindow):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         tg.addWidget(self.table)
 
+        # Table Action buttons: Export / Clear (Identical size: 50% / 50%, height 40px)
         tb = QHBoxLayout()
-        self.btn_export = QPushButton("⬇  Export to Excel"); self.btn_export.setObjectName("success"); self.btn_export.clicked.connect(self._export_excel); self.btn_export.setEnabled(False)
-        btn_clear = QPushButton("🗑  Clear Table"); btn_clear.setObjectName("danger"); btn_clear.clicked.connect(self._clear_table)
-        tb.addWidget(self.btn_export); tb.addWidget(btn_clear)
+        tb.setSpacing(10)
+        self.btn_export = QPushButton("⬇  Export to Excel")
+        self.btn_export.setObjectName("success")
+        self.btn_export.setMinimumHeight(40)
+        self.btn_export.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_export.clicked.connect(self._export_excel)
+        self.btn_export.setEnabled(False)
+
+        btn_clear = QPushButton("🗑  Clear Table")
+        btn_clear.setObjectName("danger")
+        btn_clear.setMinimumHeight(40)
+        btn_clear.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        btn_clear.clicked.connect(self._clear_table)
+
+        tb.addWidget(self.btn_export, 1)
+        tb.addWidget(btn_clear, 1)
         tg.addLayout(tb)
         lay.addWidget(tbl_grp, stretch=1)
         return w
 
+    # ── Presets Handling ───────────────────────────────────────────────────────
+    def _on_preset_clicked(self, val: float):
+        self.step_spin.setValue(val)
+
+    def _on_step_value_changed(self, val: float):
+        for p_val, btn in self.preset_btns.items():
+            if abs(p_val - val) < 0.001:
+                btn.setChecked(True)
+                btn.setStyleSheet(f"background-color: {ACCENT}; font-weight: bold; border: 1px solid {ACCENT2};")
+            else:
+                btn.setChecked(False)
+                btn.setStyleSheet(f"background-color: {BTN_NEUTRAL}; font-weight: normal; border: 1px solid transparent;")
+
+    # ── Full Screen Handling ───────────────────────────────────────────────────
+    def _toggle_fullscreen(self):
+        if self.is_fullscreen:
+            # Return to normal windowed view
+            self.is_fullscreen = False
+            if self.floating_hud:
+                self.floating_hud.hide()
+            self.top_bar_widget.show()
+            self.left_controls_widget.show()
+            self.video_control_bar.show()
+            self.right_panel.show()
+            self.btn_fs.setText("⛶ Full Screen")
+            self.showNormal()
+        else:
+            # Enter full screen mode with floating HUD
+            self.is_fullscreen = True
+            self.top_bar_widget.hide()
+            self.left_controls_widget.hide()
+            self.video_control_bar.hide()
+            self.right_panel.hide()
+            self.btn_fs.setText("✕ Exit Full Screen")
+            self.showFullScreen()
+
+            # Position floating HUD near the bottom of current screen
+            if self.floating_hud:
+                screen_geo = self.screen().geometry()
+                hud_w = min(780, screen_geo.width() - 40)
+                hud_h = 300
+                hud_x = screen_geo.x() + max(20, (screen_geo.width() - hud_w) // 2)
+                hud_y = screen_geo.y() + max(20, screen_geo.height() - hud_h - 40)
+                self.floating_hud.setGeometry(hud_x, hud_y, hud_w, hud_h)
+                self.floating_hud.show()
+                self.floating_hud.raise_()
+                self.floating_hud.activateWindow()
+
+                if self.waiting_ans:
+                    self.floating_hud.hud_ans_input.setFocus()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape and self.is_fullscreen:
+            self._toggle_fullscreen()
+            event.accept()
+            return
+        if event.key() == Qt.Key.Key_F11:
+            self._toggle_fullscreen()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def closeEvent(self, event):
+        if hasattr(self, 'floating_hud') and self.floating_hud:
+            self.floating_hud.close()
+        super().closeEvent(event)
+
     # ── Event Filter (Keyboard Shortcuts) ──────────────────────────────────────
     def eventFilter(self, obj, event):
-        if obj == self.ans_input and event.type() == QEvent.Type.KeyPress:
+        targets = []
+        if getattr(self, "ans_input", None) is not None:
+            targets.append(self.ans_input)
+        if hasattr(self, "floating_hud") and self.floating_hud and getattr(self.floating_hud, "hud_ans_input", None) is not None:
+            targets.append(self.floating_hud.hud_ans_input)
+
+        if targets and (obj in targets) and event.type() == QEvent.Type.KeyPress:
             if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-                # Ctrl+Enter or Cmd+Enter submits the question
                 if event.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.MetaModifier):
-                    if self.btn_next_q.isEnabled():
+                    btn_main = getattr(self, "btn_next_q", None)
+                    btn_hud = getattr(self.floating_hud, "hud_btn_next", None) if hasattr(self, "floating_hud") and self.floating_hud else None
+                    if (btn_main and btn_main.isEnabled()) or (btn_hud and btn_hud.isEnabled()):
                         self._next_question()
                         return True
+            elif event.key() == Qt.Key.Key_Escape and self.is_fullscreen:
+                self._toggle_fullscreen()
+                return True
         return super().eventFilter(obj, event)
 
     # ── In-App Help & Dialogs ──────────────────────────────────────────────────
     def _show_manual(self):
-        # Locate USER_MANUAL.md next to script or in PyInstaller bundle
         base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
         manual_path = os.path.join(base_dir, "USER_MANUAL.md")
         if not os.path.exists(manual_path):
@@ -359,10 +703,10 @@ class VideoAnnotator(QMainWindow):
                 "# Video Annotation Tool — Quick Guide\n\n"
                 "### Workflow:\n"
                 "1. **Load Video & Questions**: Browse to select a video and a `.txt` file with one question per line.\n"
-                "2. **Configure Range & Step**: Set start time, end time, and step interval (e.g. 1.0s).\n"
+                "2. **Configure Range & Step**: Set start time, end time, and step interval (e.g. 0.5s, 1s, 5s, 10s presets).\n"
                 "3. **Choose Label**: Select participant role (Mother or Child).\n"
-                "4. **Click Start Processing**: At each step, type your answer and click 'Next Question' (or Ctrl+Enter).\n"
-                "5. **Export to Excel**: Once finished, click 'Export to Excel' to save a styled `.xlsx` file.\n"
+                "4. **Click Start Processing**: Step through video. Use Full Screen (F11) with floating HUD for immersion.\n"
+                "5. **Export to Excel**: Once finished, click 'Export to Excel' to save formatted `.xlsx`.\n"
             )
 
         dlg = QDialog(self)
@@ -422,10 +766,49 @@ class VideoAnnotator(QMainWindow):
         clr = MOTHER_CLR if text == "Mother" else CHILD_CLR
         self.badge.setText(f"● {text}")
         self.badge.setStyleSheet(f"color:{clr}; font-weight:bold;")
+        if hasattr(self, 'floating_hud') and self.floating_hud and hasattr(self.floating_hud, 'hud_label_combo'):
+            if self.floating_hud.hud_label_combo.currentText() != text:
+                self.floating_hud.hud_label_combo.blockSignals(True)
+                self.floating_hud.hud_label_combo.setCurrentText(text)
+                self.floating_hud.hud_label_combo.blockSignals(False)
+            self._update_hud_combo_style(text)
+
+    def _on_hud_label_change(self, text):
+        self.label_combo.blockSignals(True)
+        self.label_combo.setCurrentText(text)
+        self.label_combo.blockSignals(False)
+        self._on_label_change(text)
+
+    def _update_hud_combo_style(self, text):
+        if hasattr(self, 'floating_hud') and self.floating_hud and hasattr(self.floating_hud, 'hud_label_combo'):
+            clr = MOTHER_CLR if text == "Mother" else CHILD_CLR
+            self.floating_hud.hud_label_combo.setStyleSheet(f"""
+                QComboBox {{
+                    background-color: rgba(30, 30, 46, 0.9);
+                    color: {clr};
+                    font-weight: bold;
+                    border: 1px solid {clr};
+                    border-radius: 12px;
+                    padding: 3px 8px;
+                    min-width: 80px;
+                }}
+                QComboBox::drop-down {{
+                    border: none;
+                    width: 14px;
+                }}
+                QComboBox QAbstractItemView {{
+                    background-color: {PANEL_BG};
+                    color: {TEXT_MAIN};
+                    selection-background-color: {ACCENT};
+                }}
+            """)
 
     def _on_position_changed(self, pos):
         dur = self.player.duration() or 0
-        self.time_lbl.setText(f"{fmt_time(pos)} / {fmt_time(dur)}")
+        t_str = f"{fmt_time(pos)} / {fmt_time(dur)}"
+        self.time_lbl.setText(t_str)
+        if hasattr(self, 'floating_hud') and self.floating_hud:
+            self.floating_hud.hud_time_lbl.setText(t_str)
 
     def _on_duration_changed(self, dur):
         if dur:
@@ -458,7 +841,10 @@ class VideoAnnotator(QMainWindow):
         self.current_q   = 0
         self.answers_buf = {}
         step_num = (self.current_pos - self.range_start) // self.step_ms + 1
-        self._set_status(f"Step {step_num} / {self.total_steps}  •  {fmt_time(self.current_pos)}")
+        s_text = f"Step {step_num} / {self.total_steps}  •  {fmt_time(self.current_pos)}"
+        self._set_status(s_text)
+        if hasattr(self, 'floating_hud') and self.floating_hud:
+            self.floating_hud.hud_step_lbl.setText(f"Step {step_num} / {self.total_steps}")
         self._show_question()
 
     def _show_question(self):
@@ -466,26 +852,61 @@ class VideoAnnotator(QMainWindow):
             self._save_step_records()
             self._advance_step()
             return
-        self.q_counter.setText(f"Question {self.current_q+1} / {len(self.questions)}")
-        self.q_text.setText(self.questions[self.current_q])
+
+        counter_text = f"Question {self.current_q+1} / {len(self.questions)}"
+        q_text = self.questions[self.current_q]
+
+        # Update standard panel
+        self.q_counter.setText(counter_text)
+        self.q_text.setText(q_text)
         self.ans_input.clear()
         self.ans_input.setEnabled(True)
         self.btn_next_q.setEnabled(True)
         self.btn_skip_q.setEnabled(True)
+
+        # Update floating HUD
+        if hasattr(self, 'floating_hud') and self.floating_hud:
+            self.floating_hud.hud_q_counter.setText(counter_text)
+            self.floating_hud.hud_q_text.setText(q_text)
+            self.floating_hud.hud_ans_input.clear()
+            self.floating_hud.hud_ans_input.setEnabled(True)
+            self.floating_hud.hud_btn_next.setEnabled(True)
+            self.floating_hud.hud_btn_skip.setEnabled(True)
+
         self.waiting_ans = True
+        if self.is_fullscreen and hasattr(self, 'floating_hud') and self.floating_hud:
+            self.floating_hud.hud_ans_input.setFocus()
+        else:
+            self.ans_input.setFocus()
 
     def _next_question(self):
         if not self.waiting_ans: return
-        self.answers_buf[self.current_q] = self.ans_input.toPlainText().strip()
+        # Extract response from active input
+        if self.is_fullscreen and hasattr(self, 'floating_hud') and self.floating_hud:
+            ans = self.floating_hud.hud_ans_input.toPlainText().strip()
+        else:
+            ans = self.ans_input.toPlainText().strip()
+
+        self.answers_buf[self.current_q] = ans
         self.current_q += 1
+
         self.ans_input.setEnabled(False); self.btn_next_q.setEnabled(False); self.btn_skip_q.setEnabled(False)
+        if hasattr(self, 'floating_hud') and self.floating_hud:
+            self.floating_hud.hud_ans_input.setEnabled(False)
+            self.floating_hud.hud_btn_next.setEnabled(False)
+            self.floating_hud.hud_btn_skip.setEnabled(False)
         self.waiting_ans = False
         self._show_question()
 
     def _skip_question(self):
         self.answers_buf[self.current_q] = ""
         self.current_q += 1
+
         self.ans_input.setEnabled(False); self.btn_next_q.setEnabled(False); self.btn_skip_q.setEnabled(False)
+        if hasattr(self, 'floating_hud') and self.floating_hud:
+            self.floating_hud.hud_ans_input.setEnabled(False)
+            self.floating_hud.hud_btn_next.setEnabled(False)
+            self.floating_hud.hud_btn_skip.setEnabled(False)
         self.waiting_ans = False
         self._show_question()
 
@@ -522,9 +943,17 @@ class VideoAnnotator(QMainWindow):
         self.player.pause()
         self.btn_start.setEnabled(True); self.btn_stop.setEnabled(False)
         self.ans_input.setEnabled(False); self.btn_next_q.setEnabled(False); self.btn_skip_q.setEnabled(False)
+        if hasattr(self, 'floating_hud') and self.floating_hud:
+            self.floating_hud.hud_ans_input.setEnabled(False)
+            self.floating_hud.hud_btn_next.setEnabled(False)
+            self.floating_hud.hud_btn_skip.setEnabled(False)
+            self.floating_hud.hud_q_text.setText("(processing complete)")
+            self.floating_hud.hud_q_counter.setText("Done!")
         self.q_text.setText("(processing complete)")
         self.q_counter.setText("Done!")
         self._set_status(f"✅ Finished! {len(self.records)} records. Ready to export.")
+        if self.is_fullscreen:
+            self._toggle_fullscreen()
         QMessageBox.information(self,"Done",f"Processing complete!\n{len(self.records)} annotation records collected.")
 
     def _stop_processing(self):
@@ -533,6 +962,10 @@ class VideoAnnotator(QMainWindow):
         self.player.pause()
         self.btn_start.setEnabled(True); self.btn_stop.setEnabled(False)
         self.ans_input.setEnabled(False); self.btn_next_q.setEnabled(False); self.btn_skip_q.setEnabled(False)
+        if hasattr(self, 'floating_hud') and self.floating_hud:
+            self.floating_hud.hud_ans_input.setEnabled(False)
+            self.floating_hud.hud_btn_next.setEnabled(False)
+            self.floating_hud.hud_btn_skip.setEnabled(False)
         self._set_status("⏹ Processing stopped.")
 
     # ── Export ─────────────────────────────────────────────────────────────────

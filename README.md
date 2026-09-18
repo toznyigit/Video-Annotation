@@ -11,7 +11,9 @@ A modern, fast desktop video annotation tool designed for systematic video revie
 
 ## ✨ Features
 
-- ⏱ **Interval Stepping:** Advance video at customizable step intervals (e.g., 0.5s, 1s, 2s).
+- ⏱ **Interval Stepping:** Advance video at customizable step intervals with quick-click presets (**0.5s**, **1s**, **5s**, **10s**) plus custom intervals.
+- ⛶ **Full Screen & Floating HUD:** Annotate in full-screen immersion with an integrated, translucent floating HUD for questions and answers.
+- 📐 **Resizable Video Display:** Flexible split-pane layout to scale video and table panels to your preferred size.
 - ❓ **Dynamic Questions:** Load any question list from plain text files (`.txt`).
 - 🏷 **Subject Tagging:** Real-time role labeling (**Mother** / **Child**) with color differentiation.
 - 📊 **Instant Table Review:** Monitor logged annotations live in a scrollable, sorted data table.
