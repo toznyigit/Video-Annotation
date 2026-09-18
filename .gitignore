@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environments
+.venv/
+venv/
+env/
+ENV/
+
+# PyInstaller / Build output
+build/
+dist/
+*.spec
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Test/Session outputs
+*.xlsx
+!sample_annotations.xlsx
+*.csv
