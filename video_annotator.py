@@ -27,12 +27,12 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QSplitter, QGroupBox,
     QSpinBox, QDoubleSpinBox, QTextEdit, QMessageBox, QHeaderView,
     QDialog, QTextBrowser, QSizePolicy, QFrame, QGridLayout,
-    QGraphicsDropShadowEffect,
+    QGraphicsDropShadowEffect, QTabWidget,
 )
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtCore import Qt, QUrl, QTimer, QEvent, pyqtSignal, QPoint
-from PyQt6.QtGui import QFont, QColor, QDesktopServices
+from PyQt6.QtGui import QFont, QColor, QDesktopServices, QPalette
 
 try:
     from openpyxl import Workbook
@@ -113,6 +113,62 @@ ARROW_UP_PATH, ARROW_DOWN_PATH = ensure_assets()
 STYLESHEET = f"""
 QMainWindow {{
     background-color: {DARK_BG};
+}}
+QDialog {{
+    background-color: {DARK_BG};
+    color: {TEXT_MAIN};
+}}
+QMessageBox {{
+    background-color: {SURFACE_BG};
+    color: {TEXT_MAIN};
+}}
+QMessageBox QLabel {{
+    background-color: transparent;
+    color: {TEXT_MAIN};
+    font-size: 13px;
+}}
+QMessageBox QPushButton {{
+    background-color: {ACCENT};
+    color: #ffffff;
+    border: 1px solid #4f46e5;
+    border-radius: 6px;
+    padding: 6px 18px;
+    min-width: 80px;
+    font-weight: 600;
+}}
+QMessageBox QPushButton:hover {{
+    background-color: {ACCENT_HOVER};
+}}
+QMessageBox QPushButton:pressed {{
+    background-color: #4338ca;
+}}
+QTabWidget::pane {{
+    border: 1px solid {BORDER_COLOR};
+    background-color: {SURFACE_BG};
+    border-radius: 8px;
+    top: -1px;
+}}
+QTabBar::tab {{
+    background-color: #181c2b;
+    color: #94a3b8;
+    border: 1px solid {BORDER_COLOR};
+    border-bottom: none;
+    padding: 8px 18px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    margin-right: 4px;
+    font-weight: 600;
+    font-size: 13px;
+}}
+QTabBar::tab:selected {{
+    background-color: {SURFACE_BG};
+    color: #ffffff;
+    border-top: 2px solid {ACCENT};
+    border-bottom: 1px solid {SURFACE_BG};
+}}
+QTabBar::tab:hover:!selected {{
+    background-color: #22273d;
+    color: #cbd5e1;
 }}
 QWidget {{
     color: {TEXT_MAIN};
@@ -1076,40 +1132,214 @@ class VideoAnnotator(QMainWindow):
 
         dlg = QDialog(self)
         dlg.setWindowTitle("User Manual — Video Annotation Tool")
-        dlg.resize(900, 700)
+        dlg.resize(920, 720)
+        dlg.setStyleSheet(f"background-color: {DARK_BG}; color: {TEXT_MAIN};")
+
         d_lay = QVBoxLayout(dlg)
-        d_lay.setSpacing(10)
-        d_lay.setContentsMargins(12, 12, 12, 12)
+        d_lay.setSpacing(14)
+        d_lay.setContentsMargins(20, 18, 20, 18)
+
+        # Header
+        header = QHBoxLayout()
+        header.setSpacing(12)
+        icon_lbl = QLabel("📖")
+        icon_lbl.setStyleSheet("font-size: 28px;")
+        header.addWidget(icon_lbl)
+
+        title_box = QVBoxLayout()
+        title_box.setSpacing(2)
+        title_lbl = QLabel("Video Annotation Tool — User Manual")
+        title_lbl.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {TEXT_MAIN};")
+        ver_box = QHBoxLayout()
+        ver_lbl = QLabel("Documentation & Workflow Guide")
+        ver_lbl.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px; font-weight: 500;")
+        guide_badge = QLabel("Interactive Guide")
+        guide_badge.setStyleSheet(f"background: rgba(99, 102, 241, 0.15); color: {ACCENT2}; border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 700;")
+        ver_box.addWidget(ver_lbl)
+        ver_box.addWidget(guide_badge)
+        ver_box.addStretch()
+        title_box.addWidget(title_lbl)
+        title_box.addLayout(ver_box)
+        header.addLayout(title_box)
+        header.addStretch()
+        d_lay.addLayout(header)
 
         browser = QTextBrowser()
         browser.setOpenExternalLinks(True)
+        browser.setStyleSheet(f"background-color: {INPUT_BG}; color: #cbd5e1; border: 1px solid {BORDER_COLOR}; border-radius: 8px; padding: 18px;")
         browser.setMarkdown(content)
-        browser.setStyleSheet(f"background: {INPUT_BG}; color: {TEXT_MAIN}; border: 1px solid {BORDER_COLOR}; border-radius: 8px; padding: 14px;")
-        d_lay.addWidget(browser)
+        raw_html = browser.toHtml()
+        custom_css = f"""
+        <style>
+        body {{
+            background-color: {INPUT_BG};
+            color: #cbd5e1;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 13px;
+            line-height: 1.6;
+        }}
+        h1 {{ color: {ACCENT2}; font-size: 22px; font-weight: 700; margin-bottom: 12px; border-bottom: 1px solid {BORDER_COLOR}; padding-bottom: 6px; }}
+        h2 {{ color: #a5b4fc; font-size: 17px; font-weight: 600; margin-top: 20px; margin-bottom: 8px; }}
+        h3 {{ color: #e2e8f0; font-size: 14px; font-weight: 600; margin-top: 14px; margin-bottom: 6px; }}
+        p, li {{ color: #cbd5e1; font-size: 13px; }}
+        a {{ color: {ACCENT2}; font-weight: 600; text-decoration: none; }}
+        code {{ background-color: #1e2438; color: #38bdf8; font-family: monospace; font-size: 12px; }}
+        table {{ border-collapse: collapse; margin: 12px 0; width: 100%; }}
+        th {{ background-color: #202538; color: {TEXT_MAIN}; font-weight: 700; border: 1px solid #2e354e; padding: 8px 12px; }}
+        td {{ border: 1px solid {BORDER_COLOR}; padding: 8px 12px; color: #cbd5e1; }}
+        hr {{ border: none; border-top: 1px solid {BORDER_COLOR}; margin: 16px 0; }}
+        </style>
+        """
+        styled_html = raw_html.replace("<style type=\"text/css\">", custom_css + "<style type=\"text/css\">")
+        styled_html = styled_html.replace("color:#094fd1;", f"color:{ACCENT2};")
+        browser.setHtml(styled_html)
+        d_lay.addWidget(browser, stretch=1)
 
+        bottom_bar = QHBoxLayout()
+        hint_lbl = QLabel("💡 Tip: Press F11 at any time to toggle Fullscreen Mode with the floating HUD.")
+        hint_lbl.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px;")
+        bottom_bar.addWidget(hint_lbl)
+        bottom_bar.addStretch()
+
+        btn_close = QPushButton("Close")
+        btn_close.setObjectName("primary")
+        btn_close.setFixedWidth(110)
+        btn_close.setFixedHeight(36)
+        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_close.clicked.connect(dlg.accept)
+        bottom_bar.addWidget(btn_close)
+        d_lay.addLayout(bottom_bar)
+
+        dlg.exec()
+
+    def _show_about(self):
+        base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        license_path = os.path.join(base_dir, "LICENSE")
+        if not os.path.exists(license_path):
+            license_path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "LICENSE")
+
+        license_text = ""
+        if os.path.exists(license_path):
+            try:
+                with open(license_path, "r", encoding="utf-8") as f:
+                    license_text = f.read()
+            except Exception as e:
+                license_text = f"Error reading LICENSE: {e}"
+        if not license_text:
+            license_text = (
+                "GNU GENERAL PUBLIC LICENSE\n"
+                "Version 3, 29 June 2007\n\n"
+                "Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>\n"
+                "Everyone is permitted to copy and distribute verbatim copies\n"
+                "of this license document, but changing it is not allowed.\n\n"
+                "This program is free software: you can redistribute it and/or modify\n"
+                "it under the terms of the GNU General Public License as published by\n"
+                "the Free Software Foundation, either version 3 of the License, or\n"
+                "(at your option) any later version.\n\n"
+                "This program is distributed in the hope that it will be useful,\n"
+                "but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+                "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the\n"
+                "GNU General Public License for more details.\n"
+            )
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("About & License — Video Annotation Tool")
+        dlg.resize(760, 580)
+        dlg.setStyleSheet(f"background-color: {DARK_BG}; color: {TEXT_MAIN};")
+
+        d_lay = QVBoxLayout(dlg)
+        d_lay.setContentsMargins(20, 18, 20, 18)
+        d_lay.setSpacing(14)
+
+        # Header
+        header = QHBoxLayout()
+        header.setSpacing(12)
+        icon_lbl = QLabel("🎬")
+        icon_lbl.setStyleSheet("font-size: 28px;")
+        header.addWidget(icon_lbl)
+
+        title_box = QVBoxLayout()
+        title_box.setSpacing(2)
+        title_lbl = QLabel("Video Annotation Tool")
+        title_lbl.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {TEXT_MAIN};")
+        ver_box = QHBoxLayout()
+        ver_lbl = QLabel(f"Version {__version__}")
+        ver_lbl.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px; font-weight: 500;")
+        gpl_badge = QLabel("GNU GPL v3.0")
+        gpl_badge.setStyleSheet(f"background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 700;")
+        ver_box.addWidget(ver_lbl)
+        ver_box.addWidget(gpl_badge)
+        ver_box.addStretch()
+        title_box.addWidget(title_lbl)
+        title_box.addLayout(ver_box)
+        header.addLayout(title_box)
+        header.addStretch()
+        d_lay.addLayout(header)
+
+        tabs = QTabWidget()
+
+        # Tab 1: Overview
+        tab_about = QWidget()
+        tab_about_lay = QVBoxLayout(tab_about)
+        tab_about_lay.setContentsMargins(16, 16, 16, 16)
+        tab_about_lay.setSpacing(12)
+
+        about_browser = QTextBrowser()
+        about_browser.setOpenExternalLinks(True)
+        about_browser.setStyleSheet(f"background-color: {INPUT_BG}; color: {TEXT_MAIN}; border: 1px solid {BORDER_COLOR}; border-radius: 8px; padding: 16px;")
+        about_html = f"""
+        <div style="font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; font-size: 13px; color: #cbd5e1; line-height: 1.6;">
+            <p style="margin-top: 0; font-size: 14px; color: #f8fafc;">
+                <b>Video Annotation Tool</b> is an interactive desktop application for researchers, clinicians, and annotators to systematically log observations at defined video time intervals.
+            </p>
+            <h4 style="color: {ACCENT2}; margin-bottom: 6px; margin-top: 14px;">Core Capabilities</h4>
+            <ul style="margin-top: 4px; padding-left: 20px;">
+                <li>Frame-by-frame interval stepping with quick presets (0.5s, 1s, 5s, 10s) and custom intervals</li>
+                <li>Immersive Full Screen mode with glassmorphic floating HUD</li>
+                <li>Predefined question queue loaded from plain text files</li>
+                <li>Participant categorization with visual badges (Mother / Child)</li>
+                <li>Live observation verification table with styled Excel (.xlsx) and CSV export</li>
+            </ul>
+            <h4 style="color: {ACCENT2}; margin-bottom: 6px; margin-top: 14px;">Open Source License</h4>
+            <p style="margin-top: 4px;">
+                Distributed under the <b>GNU General Public License v3.0 (GPL-3.0)</b>. This is free software: you are free to inspect, modify, and redistribute it. There is NO WARRANTY, to the extent permitted by law.
+            </p>
+            <p style="margin-top: 12px;">
+                <b>GitHub Repository:</b> <a href="https://github.com/toznyigit/Video-Annotation" style="color: {ACCENT2}; font-weight: 600; text-decoration: none;">https://github.com/toznyigit/Video-Annotation</a><br>
+                <b>License Terms:</b> <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color: {ACCENT2}; font-weight: 600; text-decoration: none;">https://www.gnu.org/licenses/gpl-3.0.html</a>
+            </p>
+        </div>
+        """
+        about_browser.setHtml(about_html)
+        tab_about_lay.addWidget(about_browser)
+        tabs.addTab(tab_about, "📌 About Overview")
+
+        # Tab 2: Full License
+        tab_lic = QWidget()
+        tab_lic_lay = QVBoxLayout(tab_lic)
+        tab_lic_lay.setContentsMargins(16, 16, 16, 16)
+
+        lic_browser = QTextBrowser()
+        lic_browser.setStyleSheet(f"background-color: {INPUT_BG}; color: #94a3b8; border: 1px solid {BORDER_COLOR}; border-radius: 8px; padding: 14px; font-family: monospace; font-size: 11px;")
+        lic_browser.setPlainText(license_text)
+        tab_lic_lay.addWidget(lic_browser)
+        tabs.addTab(tab_lic, "⚖️ Full License (GPL-3.0)")
+
+        d_lay.addWidget(tabs, stretch=1)
+
+        # Close button row
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         btn_close = QPushButton("Close")
-        btn_close.setObjectName("neutral")
-        btn_close.setFixedWidth(100)
+        btn_close.setObjectName("primary")
+        btn_close.setFixedWidth(110)
+        btn_close.setFixedHeight(36)
         btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_close.clicked.connect(dlg.accept)
         btn_row.addWidget(btn_close)
         d_lay.addLayout(btn_row)
 
         dlg.exec()
-
-    def _show_about(self):
-        about_text = (
-            f"<h3>🎬 Video Annotation Tool v{__version__}</h3>"
-            "<p>A modern desktop video observation and interval annotation system.</p>"
-            "<p><b>License:</b> GNU General Public License v3.0 (GPL-3.0)<br>"
-            "This is free software; you are free to change and redistribute it under GPLv3.<br>"
-            "There is NO WARRANTY, to the extent permitted by law.</p>"
-            "<p>Full license terms are available in the bundled <code>LICENSE</code> file or at:<br>"
-            f"<a href='https://www.gnu.org/licenses/gpl-3.0.html' style='color:{ACCENT2};'>https://www.gnu.org/licenses/gpl-3.0.html</a></p>"
-        )
-        QMessageBox.about(self, "About Video Annotation Tool", about_text)
 
     # ── File browsing ──────────────────────────────────────────────────────────
     def _browse_video(self):
@@ -1431,6 +1661,25 @@ class VideoAnnotator(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Video Annotator")
+
+    # Configure application-wide dark palette for native dialogs and popups
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor(DARK_BG))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor(TEXT_MAIN))
+    palette.setColor(QPalette.ColorRole.Base, QColor(SURFACE_BG))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(INPUT_BG))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(SURFACE_BG))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(TEXT_MAIN))
+    palette.setColor(QPalette.ColorRole.Text, QColor(TEXT_MAIN))
+    palette.setColor(QPalette.ColorRole.Button, QColor(BTN_NEUTRAL))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(ACCENT))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.Link, QColor(ACCENT2))
+    palette.setColor(QPalette.ColorRole.LinkVisited, QColor("#a5b4fc"))
+    app.setPalette(palette)
+    app.setStyleSheet(STYLESHEET)
+
     win = VideoAnnotator()
     win.show()
     sys.exit(app.exec())
