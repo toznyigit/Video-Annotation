@@ -2,7 +2,7 @@
 # ==============================================================================
 # Build Standalone Executable for macOS (PyInstaller)
 # Produces dist/VideoAnnotator.app and dist/VideoAnnotator-macOS.zip
-# No Python installation required by end users!
+# Preserves symlinks, code signatures, and excludes unused plugins
 # ==============================================================================
 
 set -e
@@ -30,31 +30,52 @@ if ! command -v pyinstaller >/dev/null 2>&1; then
 fi
 
 # Clean previous build artifacts
-echo " [1/3] Cleaning previous build folders..."
+echo " [1/4] Cleaning previous build folders..."
 rm -rf build dist *.spec
 
 # Build with PyInstaller
-echo " [2/3] Compiling standalone macOS bundle..."
+echo " [2/4] Compiling standalone macOS bundle..."
 pyinstaller \
     --name="VideoAnnotator" \
     --windowed \
     --noconfirm \
     --clean \
+    --osx-bundle-identifier="com.toznyigit.videoannotator" \
     --add-data="USER_MANUAL.md:." \
     --add-data="LICENSE:." \
     --hidden-import="openpyxl" \
     --hidden-import="openpyxl.styles" \
+    --hidden-import="PyQt6.QtCore" \
+    --hidden-import="PyQt6.QtGui" \
+    --hidden-import="PyQt6.QtWidgets" \
     --hidden-import="PyQt6.QtMultimedia" \
     --hidden-import="PyQt6.QtMultimediaWidgets" \
-    --collect-all="PyQt6" \
+    --collect-all="PyQt6.QtMultimedia" \
+    --collect-all="PyQt6.QtMultimediaWidgets" \
+    --exclude-module="PyQt6.QtQml" \
+    --exclude-module="PyQt6.QtQuick" \
+    --exclude-module="PyQt6.QtWebEngineCore" \
+    --exclude-module="PyQt6.QtWebEngineWidgets" \
+    --exclude-module="PyQt6.QtLocation" \
+    --exclude-module="PyQt6.QtPositioning" \
+    --exclude-module="PyQt6.QtSensors" \
+    --exclude-module="PyQt6.QtBluetooth" \
+    --exclude-module="PyQt6.Qt3DCore" \
+    --exclude-module="PyQt6.Qt3DRender" \
+    --exclude-module="PyQt6.Qt3DQuick" \
     video_annotator.py
 
-# Package into zip with User Manual and License for easy distribution
-echo " [3/3] Creating distribution archive (VideoAnnotator-macOS.zip)..."
+# Re-sign the entire .app bundle deeply to satisfy macOS ARM64 PAC security
+echo " [3/4] Deep signing application bundle for macOS ARM64..."
+codesign --force --deep --sign - "dist/VideoAnnotator.app"
+
+# Package into zip with symlink preservation (-y)
+echo " [4/4] Creating distribution archive (VideoAnnotator-macOS.zip)..."
 cd dist
 cp ../USER_MANUAL.md ./
 cp ../LICENSE ./
-zip -r -q "VideoAnnotator-macOS.zip" "VideoAnnotator.app" "USER_MANUAL.md" "LICENSE"
+# Note: -y preserves symlinks which are vital for macOS framework resolution!
+zip -r -y -q "VideoAnnotator-macOS.zip" "VideoAnnotator.app" "USER_MANUAL.md" "LICENSE"
 cd ..
 
 echo ""

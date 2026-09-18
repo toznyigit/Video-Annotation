@@ -71,11 +71,40 @@ jobs:
 
       - name: Build macOS Application
         run: |
-          pyinstaller --name="VideoAnnotator" --windowed --noconfirm --clean --add-data="USER_MANUAL.md:." --add-data="LICENSE:." --hidden-import="openpyxl" --hidden-import="openpyxl.styles" --hidden-import="PyQt6.QtMultimedia" --hidden-import="PyQt6.QtMultimediaWidgets" --collect-all="PyQt6" video_annotator.py
+          pyinstaller \
+            --name="VideoAnnotator" \
+            --windowed \
+            --noconfirm \
+            --clean \
+            --osx-bundle-identifier="com.toznyigit.videoannotator" \
+            --add-data="USER_MANUAL.md:." \
+            --add-data="LICENSE:." \
+            --hidden-import="openpyxl" \
+            --hidden-import="openpyxl.styles" \
+            --hidden-import="PyQt6.QtCore" \
+            --hidden-import="PyQt6.QtGui" \
+            --hidden-import="PyQt6.QtWidgets" \
+            --hidden-import="PyQt6.QtMultimedia" \
+            --hidden-import="PyQt6.QtMultimediaWidgets" \
+            --collect-all="PyQt6.QtMultimedia" \
+            --collect-all="PyQt6.QtMultimediaWidgets" \
+            --exclude-module="PyQt6.QtQml" \
+            --exclude-module="PyQt6.QtQuick" \
+            --exclude-module="PyQt6.QtWebEngineCore" \
+            --exclude-module="PyQt6.QtWebEngineWidgets" \
+            --exclude-module="PyQt6.QtLocation" \
+            --exclude-module="PyQt6.QtPositioning" \
+            --exclude-module="PyQt6.QtSensors" \
+            --exclude-module="PyQt6.QtBluetooth" \
+            --exclude-module="PyQt6.Qt3DCore" \
+            --exclude-module="PyQt6.Qt3DRender" \
+            --exclude-module="PyQt6.Qt3DQuick" \
+            video_annotator.py
+          codesign --force --deep --sign - "dist/VideoAnnotator.app"
           cd dist
           cp ../USER_MANUAL.md ./
           cp ../LICENSE ./
-          zip -r -q "VideoAnnotator-macOS.zip" "VideoAnnotator.app" "USER_MANUAL.md" "LICENSE"
+          zip -r -y -q "VideoAnnotator-macOS.zip" "VideoAnnotator.app" "USER_MANUAL.md" "LICENSE"
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
