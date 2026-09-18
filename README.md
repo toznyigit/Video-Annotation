@@ -1,6 +1,7 @@
 # Video Annotation Tool
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/toznyigit/Video-Annotation?color=blue&label=Latest%20Release)](https://github.com/toznyigit/Video-Annotation/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](USER_MANUAL.md)
 [![Python 3](https://img.shields.io/badge/Python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-green.svg)](https://pypi.org/project/PyQt6/)
@@ -26,23 +27,30 @@ A modern, fast desktop video annotation tool designed for systematic video revie
 ## 🚀 Quick Start
 
 ### 1. Standalone Executable (No Python Required)
-Download the latest precompiled release for your operating system:
-- **macOS:** Download `VideoAnnotator-macOS.zip` from [Releases](https://github.com), unzip and run `Video Annotator.app`.
-- **Windows:** Download and double-click `VideoAnnotator.exe` from [Releases](https://github.com).
+Precompiled zero-dependency binaries are available directly from the **[GitHub Releases](https://github.com/toznyigit/Video-Annotation/releases)**:
+
+- 🍏 **macOS:**
+  - **Direct Download:** [**`VideoAnnotator-macOS.zip`**](https://github.com/toznyigit/Video-Annotation/releases/latest/download/VideoAnnotator-macOS.zip)
+  - Alternatively, download from the [Latest Release Page](https://github.com/toznyigit/Video-Annotation/releases/latest). Unzip and run `VideoAnnotator.app`.
+- 🪟 **Windows:**
+  - **Direct Download:** [**`VideoAnnotator-Windows.zip`**](https://github.com/toznyigit/Video-Annotation/releases/latest/download/VideoAnnotator-Windows.zip)
+  - Alternatively, download from the [Latest Release Page](https://github.com/toznyigit/Video-Annotation/releases/latest). Unzip and double-click `VideoAnnotator.exe`.
+
+📦 **All Versions & Changelogs:** [Browse all GitHub Releases](https://github.com/toznyigit/Video-Annotation/releases)
 
 ### 2. From Source Code
 
 #### macOS / Linux
 ```bash
-git clone https://github.com/your-username/video-annotator.git
-cd video-annotator
+git clone https://github.com/toznyigit/Video-Annotation.git
+cd Video-Annotation
 ./run.sh
 ```
 
 #### Windows
 ```cmd
-git clone https://github.com/your-username/video-annotator.git
-cd video-annotator
+git clone https://github.com/toznyigit/Video-Annotation.git
+cd Video-Annotation
 run.bat
 ```
 

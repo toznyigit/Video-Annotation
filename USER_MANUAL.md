@@ -42,7 +42,7 @@ You can run the Video Annotation Tool in two ways:
 
 | Platform | How to Run |
 | :--- | :--- |
-| **macOS** | Unzip `VideoAnnotator-macOS.zip`, open `Video Annotator.app` (or run `dist/VideoAnnotator`). If macOS displays a Gatekeeper prompt on first launch, right-click the app and choose **Open**. |
+| **macOS** | Unzip `VideoAnnotator-macOS.zip`, open `VideoAnnotator.app`. If macOS displays a Gatekeeper prompt on first launch, right-click the app and choose **Open**. |
 | **Windows** | Double-click `VideoAnnotator.exe`. No installation or Python setup is necessary. |
 
 ---
